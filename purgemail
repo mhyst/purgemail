@@ -1,0 +1,126 @@
+#!/usr/bin/python2.7
+# -*- coding: utf-8 -*-
+import gmail
+import os
+from optparse import OptionParser
+
+# Function for loading rules
+def load():
+	rules=[]
+	
+	path = os.path.join(os.path.expanduser('~'), ".config/purgemail/purgemail.conf")
+	file = open(path,'r')
+	for line in file:
+		search = line.replace("\n","").split("#")
+		sactions = search[1].split(":")
+		actions = []
+		for a in sactions:
+			saction = a.split("=")
+			if len(saction) == 2:
+				action = {'action':saction[0],'name':saction[1]}
+			else:
+				action = {'action':saction[0],'name':""}
+			actions.append(action)
+		
+		rule = {"search":search[0], "actions": actions}
+		
+		rules.append(rule)
+
+	file.close()
+	return rules	
+
+def loadConf(filename):
+	path = os.path.join(os.path.expanduser('~'), filename)
+	file = open(path,'r')
+	data = file.readline()
+	file.close()
+	return data
+
+# Procesar linea de comandos
+parser = OptionParser()
+parser.add_option("-a", "--all", 
+				  action="store_true", dest="read", default=False,
+				  help="Procesar todo el correo")
+parser.add_option("-d", "--debug",
+				  action="store_true", dest="verbose", default=False,
+				  help="Mostrar mensajes de depuracion")
+parser.add_option("-s", "--search", dest="name",
+				  help="Procesar correos que coincidan con la cadena",
+				  metavar="STRING", default="")
+#parser.add_option("-f", "--file", dest="filename",
+#                  help="write report to FILE", metavar="FILE")
+#parser.add_option("-q", "--quiet",
+#                  action="store_false", dest="verbose", default=True,
+#                  help="don't print status messages to stdout")
+
+(options, args) = parser.parse_args()
+
+address = loadConf('.config/purgemail/mailaddress')
+password = loadConf('.config/purgemail/password')
+
+# Conectar a gmail
+g = gmail.login (address,password)
+if not g.logged_in:
+	print "No se ha podido conectar a gmail."
+	exit(1)
+
+print "Conexion conseguida"
+
+# Cargamos las reglas
+rules = load()
+
+if options.verbose:
+	print (rules)
+
+
+if options.read:
+	print("Procesar todo el correo")
+	messages = g.inbox().mail()
+elif options.name != "":
+	print("Procesar correo que coincide con la cadena de búsqueda")
+	messages = g.inbox().mail(sender=options.name)
+else:	
+	print("Procesar correo no leído")
+	messages = g.inbox().mail(unread=True)
+
+count=0
+for m in messages:
+	m.fetch()
+	print (m.fr + ">>>" + m.subject)
+	count+=1
+
+	for rule in rules:
+		#print("Search: "+rule['search'])
+		if rule['search'] in m.fr:
+			#print("Entra por"+rule['search'])
+			romper=False
+			for a in rule['actions']:
+				action = a['action']
+				name = a['name']
+				#print ("Action: "+action+" Name: "+name)
+				if action == 'read':
+					m.read()
+					print(">>> Marcado como leido")
+				elif action == 'star':
+					m.star()
+					print(">>> Estrella")
+				elif action == 'label':
+					m.add_label(name)
+					print(">>> Etiquetado "+name)
+				elif action == 'delete':
+					m.delete()
+					print(">>> Borrado")
+					romper=True
+				elif action == 'move':
+					m.move_to(name)
+					print(">>> Movido a bandeja "+name)
+				elif action == 'archive':
+					m.archive()
+					print(">>> Archivado")
+			if romper:
+				break
+
+if count == 0:
+	print "No tiene correo sin leer"
+
+g.logout()
