@@ -1,5 +1,5 @@
 #!/usr/bin/python2.7
-# -*- coding: utf-8 -*-
+# -*- coding: utf8 -*-
 import gmail
 import os
 from optparse import OptionParser
@@ -78,15 +78,15 @@ if options.read:
 	messages = g.inbox().mail()
 elif options.name != "":
 	print("Procesar correo que coincide con la cadena de búsqueda")
-	messages = g.inbox().mail(sender=options.name)
+	messages = g.inbox().mail(sender=options.name, prefetch=True)
 else:	
 	print("Procesar correo no leído")
-	messages = g.inbox().mail(unread=True)
+	messages = g.inbox().mail(unread=True, prefetch=True)
 
 count=0
 for m in messages:
-	m.fetch()
-	print (m.fr + ">>>" + m.subject)
+	# m.fetch()
+	print ("From: " + m.fr)
 	count+=1
 
 	for rule in rules:
